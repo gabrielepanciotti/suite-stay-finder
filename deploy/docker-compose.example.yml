@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: stayfinder
+      POSTGRES_USER: stayfinder
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stayfinder -d stayfinder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      target: dev
+    environment:
+      DATABASE_URL: postgresql+asyncpg://stayfinder:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:5432/stayfinder
+    ports:
+      - "8000:10021"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+      target: dev
+    environment:
+      VITE_BACKEND_PROXY_TARGET: http://backend:10021
+    ports:
+      - "5173:3355"
+    depends_on:
+      backend:
+        condition: service_started
